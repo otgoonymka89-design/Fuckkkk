@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AR Avatar - Arm Axis Fix</title>
+    <title>AR Avatar - Final Arm Fix</title>
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
@@ -38,41 +38,34 @@ AFRAME.registerComponent('viseme-lipsync', {
 
         this.el.addEventListener('model-loaded', () => {
             const obj = this.el.getObject3D('mesh');
-
-            // Анимэйшнийг бүрэн зогсоох (Гарны байрлалыг кодоор удирдахад саад болдог)
-            this.el.removeAttribute('animation-mixer');
+            this.el.removeAttribute('animation-mixer'); // Анимэйшнийг хүчээр хаах
 
             obj.traverse(node => {
                 if (node.isBone) {
                     const name = node.name.toLowerCase();
                     
-                    // Зүүн гарны яс (Shoulder / Arm / UpperArm)
-                    if (name.includes('leftarm') || name.includes('lupperarm') || name.includes('l_arm') || name.includes('l_shoulder')) {
-                        node.rotation.set(0, 0, 0); // Тэглэх
-                        // Моделийн XYZ тэнхлэгийн аль нэг дээр нь доошлуулж үзэх:
-                        node.rotation.z = 1.3; // Хажуу тийш (Standart)
-                        node.rotation.y = 0;   
-                        node.rotation.x = -0.2; // Бага зэрэг бие рүү нь шахах
-                    }
-                    
-                    // Баруун гарны яс
-                    if (name.includes('rightarm') || name.includes('rupperarm') || name.includes('r_arm') || name.includes('r_shoulder')) {
-                        node.rotation.set(0, 0, 0); // Тэглэх
-                        node.rotation.z = -1.3; // Хажуу тийш (Standart)
-                        node.rotation.y = 0;
-                        node.rotation.x = -0.2; // Бага зэрэг бие рүү нь шахах
+                    // ГАРНЫ ЯСНЫ ЭРГЭЛТИЙГ ЗАСАХ (Ready Player Me стандартаар)
+                    if (name.includes('arm') || name.includes('upperarm') || name.includes('shoulder')) {
+                        node.rotation.set(0, 0, 0); // Бүх эргэлтийг тэглэх
+                        
+                        if (name.includes('left')) {
+                            // X тэнхлэг дээр 1.4-1.5 орчим эргүүлэхэд гар доошоо буудаг
+                            node.rotation.x = 1.4; 
+                            node.rotation.z = 0.2; 
+                        }
+                        if (name.includes('right')) {
+                            node.rotation.x = 1.4;
+                            node.rotation.z = -0.2;
+                        }
                     }
                 }
 
                 if (node.morphTargetDictionary && node.morphTargetInfluences) {
-                    mesh = node;
-                    dict = node.morphTargetDictionary;
-                    infl = node.morphTargetInfluences;
+                    mesh = node; dict = node.morphTargetDictionary; infl = node.morphTargetInfluences;
                 }
             });
         });
 
-        // LIP SYNC LOGIC (Таны өмнөх кодтой ижил)
         const V = name => dict && dict[name] !== undefined ? dict[name] : -1;
         const vis = {
             aa: () => V('viseme_aa'), ee: () => V('viseme_E'),
