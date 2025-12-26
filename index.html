@@ -1,89 +1,68 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <title>AR Talking Human</title>
+<meta charset="utf-8">
+<title>AR Talking Human</title>
 
-  <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
+<script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
 </head>
 
 <body style="margin:0; overflow:hidden;">
-<a-scene
-  embedded
-  arjs="sourceType: webcam; debugUIEnabled: false;">
+<a-scene embedded arjs="sourceType: webcam;">
 
-  <a-assets>
-    <a-asset-item id="avatarGLB" src="avatar.glb"></a-asset-item>
-    <audio id="voice" src="voice.mp3" preload="auto"></audio>
-  </a-assets>
+<a-assets>
+  <audio id="voice" src="voice.mp3"></audio>
+  <a-asset-item id="human" src="avatar.glb"></a-asset-item>
+</a-assets>
 
-  <!-- HIRO MARKER -->
-  <a-marker preset="hiro">
-    <a-entity
-      id="avatar"
-      gltf-model="#avatarGLB"
-      position="0 0 0"
-      scale="0.3 0.3 0.3"
-      rotation="0 180 0"
-      viseme-lipsync>
-    </a-entity>
-  </a-marker>
+<a-marker preset="hiro">
+  <a-entity
+    id="model"
+    gltf-model="#human"
+    scale="1 1 1"
+    position="0 0 0"
+    lipsync>
+  </a-entity>
+</a-marker>
 
-  <a-entity camera></a-entity>
+<a-entity camera></a-entity>
 </a-scene>
 
 <script>
-AFRAME.registerComponent('viseme-lipsync', {
+AFRAME.registerComponent('lipsync', {
   init() {
     const audio = document.querySelector('#voice');
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
     const src = ctx.createMediaElementSource(audio);
     const analyser = ctx.createAnalyser();
-    analyser.fftSize = 2048;
     src.connect(analyser);
     analyser.connect(ctx.destination);
 
-    const data = new Uint8Array(analyser.frequencyBinCount);
-
-    let dict, infl;
-
-    this.el.addEventListener('model-loaded', () => {
-      this.el.getObject3D('mesh').traverse(n => {
-        if (n.morphTargetDictionary) {
-          dict = n.morphTargetDictionary;
-          infl = n.morphTargetInfluences;
+    let mouth;
+    this.el.addEventListener('model-loaded',()=>{
+      this.el.getObject3D('mesh').traverse(o=>{
+        if(o.morphTargetDictionary?.mouthOpen!==undefined){
+          mouth = o;
         }
       });
     });
 
-    const V = n => dict && dict[n] !== undefined ? dict[n] : -1;
-    const smooth = (i,v)=>{ if(i>=0) infl[i]=infl[i]*0.6+v*0.4; };
-    const clamp = v=>Math.max(0,Math.min(1,v));
-    const avg=(a,b)=>{
-      let s=0,c=0;
-      for(let i=a;i<b && i<data.length;i++){ s+=data[i]; c++; }
-      return (s/c)/255;
+    const data = new Uint8Array(analyser.frequencyBinCount);
+
+    const loop=()=>{
+      if(mouth){
+        analyser.getByteFrequencyData(data);
+        const v = data[10]/255;
+        mouth.morphTargetInfluences[mouth.morphTargetDictionary.mouthOpen]=v;
+      }
+      requestAnimationFrame(loop);
     };
 
-    const animate = ()=>{
-      analyser.getByteFrequencyData(data);
-      const low=avg(0,200);
-      const mid=avg(200,1200);
-
-      infl && infl.fill(0);
-
-      smooth(V('viseme_aa'), clamp(low*1.5));
-      smooth(V('viseme_E'), clamp(mid*1.2));
-      smooth(V('mouthOpen'), clamp(low*1.8));
-
-      requestAnimationFrame(animate);
-    };
-
-    window.addEventListener('click', async()=>{
+    window.addEventListener('click',async()=>{
       await ctx.resume();
       audio.play();
-      animate();
+      loop();
     },{once:true});
   }
 });
