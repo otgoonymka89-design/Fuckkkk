@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AR Avatar - Final Arm Fix</title>
+    <title>AR Avatar - Correct Arms</title>
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
@@ -38,24 +38,26 @@ AFRAME.registerComponent('viseme-lipsync', {
 
         this.el.addEventListener('model-loaded', () => {
             const obj = this.el.getObject3D('mesh');
-            this.el.removeAttribute('animation-mixer'); // Анимэйшнийг хүчээр хаах
+            this.el.removeAttribute('animation-mixer'); // Анимэйшнийг бүрэн идэвхгүй болгох
 
             obj.traverse(node => {
                 if (node.isBone) {
                     const name = node.name.toLowerCase();
                     
-                    // ГАРНЫ ЯСНЫ ЭРГЭЛТИЙГ ЗАСАХ (Ready Player Me стандартаар)
+                    // Зөвхөн мөр болон гарын дээд хэсэгт нөлөөлнө
                     if (name.includes('arm') || name.includes('upperarm') || name.includes('shoulder')) {
-                        node.rotation.set(0, 0, 0); // Бүх эргэлтийг тэглэх
+                        node.rotation.set(0, 0, 0); // Тэнхлэгийг цэвэрлэх
                         
                         if (name.includes('left')) {
-                            // X тэнхлэг дээр 1.4-1.5 орчим эргүүлэхэд гар доошоо буудаг
-                            node.rotation.x = 1.4; 
-                            node.rotation.z = 0.2; 
+                            // Гар бие рүү орохоос сэргийлж, гадна тал руу нь доошлуулна
+                            node.rotation.x = 0; 
+                            node.rotation.y = 0;
+                            node.rotation.z = 1.3; // Хажуу тийш нь доош нь унжуулах
                         }
                         if (name.includes('right')) {
-                            node.rotation.x = 1.4;
-                            node.rotation.z = -0.2;
+                            node.rotation.x = 0;
+                            node.rotation.y = 0;
+                            node.rotation.z = -1.3; // Хажуу тийш нь доош нь унжуулах
                         }
                     }
                 }
@@ -66,11 +68,15 @@ AFRAME.registerComponent('viseme-lipsync', {
             });
         });
 
+        // LIP SYNC LOGIC
         const V = name => dict && dict[name] !== undefined ? dict[name] : -1;
         const vis = {
-            aa: () => V('viseme_aa'), ee: () => V('viseme_E'),
-            ii: () => V('viseme_I'), oo: () => V('viseme_O'),
-            uu: () => V('viseme_U'), sil: () => V('viseme_sil'),
+            aa: () => V('viseme_aa'),
+            ee: () => V('viseme_E'),
+            ii: () => V('viseme_I'),
+            oo: () => V('viseme_O'),
+            uu: () => V('viseme_U'),
+            sil: () => V('viseme_sil'),
             open: () => V('mouthOpen')
         };
         const smooth = (i, v) => { if (i >= 0) infl[i] = infl[i] * 0.6 + v * 0.4; };
