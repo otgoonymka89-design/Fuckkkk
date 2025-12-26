@@ -52,14 +52,14 @@ AFRAME.registerComponent('viseme-lipsync', {
                         
                         if (name.includes('left')) {
                             // Z тэнхлэгийг 1.4 болгосноор гар хажуу тийшээ зөв бууна
-                            node.rotation.z = 1.4; 
-                            node.rotation.x = 0; 
+                            node.rotation.z = 0; 
+                            node.rotation.x = 1; 
                             node.rotation.y = 0;
                         }
                         if (name.includes('right')) {
                             // Баруун гарыг эсрэг чиглэлд
-                            node.rotation.z = -1.4;
-                            node.rotation.x = 0;
+                            node.rotation.z = 0;
+                            node.rotation.x = -1;
                             node.rotation.y = 0;
                         }
                     }
@@ -119,3 +119,4 @@ AFRAME.registerComponent('viseme-lipsync', {
 </script>
 </body>
 </html>
+
