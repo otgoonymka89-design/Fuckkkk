@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AR Avatar - Correct Arms</title>
+    <title>AR Avatar - Original Pose</title>
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
@@ -19,7 +19,7 @@
             <a-entity id="avatar"
                 gltf-model="avatar.glb"
                 scale="1.3 1.3 1.3"
-                position="0 -2 0" 
+                position="0 -1.8 0" 
                 viseme-lipsync>
             </a-entity>
         </a-entity>
@@ -38,37 +38,22 @@ AFRAME.registerComponent('viseme-lipsync', {
 
         this.el.addEventListener('model-loaded', () => {
             const obj = this.el.getObject3D('mesh');
-            this.el.removeAttribute('animation-mixer'); // Анимэйшнийг бүрэн идэвхгүй болгох
+            
+            // Бүх анимэйшн болон кодоор хийсэн эргэлтийг бүрэн устгав
+            // Ингэснээр модель анхны (A-pose) файл дээрх шигээ харагдана
+            this.el.removeAttribute('animation-mixer');
 
             obj.traverse(node => {
-                if (node.isBone) {
-                    const name = node.name.toLowerCase();
-                    
-                    // Зөвхөн мөр болон гарын дээд хэсэгт нөлөөлнө
-                    if (name.includes('arm') || name.includes('upperarm') || name.includes('shoulder')) {
-                        node.rotation.set(0, 0, 0); // Тэнхлэгийг цэвэрлэх
-                        
-                        if (name.includes('left')) {
-                            // Гар бие рүү орохоос сэргийлж, гадна тал руу нь доошлуулна
-                            node.rotation.x = 0; 
-                            node.rotation.y = 0;
-                            node.rotation.z = 1.3; // Хажуу тийш нь доош нь унжуулах
-                        }
-                        if (name.includes('right')) {
-                            node.rotation.x = 0;
-                            node.rotation.y = 0;
-                            node.rotation.z = -1.3; // Хажуу тийш нь доош нь унжуулах
-                        }
-                    }
-                }
-
+                // Зөвхөн LipSync Morph-ийг олж авна
                 if (node.morphTargetDictionary && node.morphTargetInfluences) {
-                    mesh = node; dict = node.morphTargetDictionary; infl = node.morphTargetInfluences;
+                    mesh = node; 
+                    dict = node.morphTargetDictionary; 
+                    infl = node.morphTargetInfluences;
                 }
             });
         });
 
-        // LIP SYNC LOGIC
+        // LIP SYNC LOGIC (Хэвээрээ ажиллана)
         const V = name => dict && dict[name] !== undefined ? dict[name] : -1;
         const vis = {
             aa: () => V('viseme_aa'),
@@ -79,7 +64,7 @@ AFRAME.registerComponent('viseme-lipsync', {
             sil: () => V('viseme_sil'),
             open: () => V('mouthOpen')
         };
-        const smooth = (i, v) => { if (i >= 0) infl[i] = infl[i] * 0.6 + v * 0.4; };
+        const smooth = (i, v) => { if (i >= 0) infl[i] = (infl[i] || 0) * 0.6 + v * 0.4; };
 
         const animate = () => {
             if (!analyser) return;
@@ -90,6 +75,7 @@ AFRAME.registerComponent('viseme-lipsync', {
                 return (s / c) / 255;
             };
             const low = avg(0, 200); const mid = avg(200, 1200);
+            
             Object.values(vis).forEach(f => { const i = f(); if (i >= 0) infl[i] = 0; });
             smooth(vis.aa(), Math.min(1, low * 3.5));
             smooth(vis.open(), Math.min(1, low * 3.0));
