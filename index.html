@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>AR Morph Mouth</title>
+<title>AR Human FIX</title>
 
 <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
@@ -10,71 +10,31 @@
 
 <body style="margin:0; overflow:hidden;">
 <a-scene
+  vr-mode-ui="enabled: false"
   embedded
   arjs="sourceType: webcam; debugUIEnabled: false;">
 
-<a-assets>
-  <audio id="voice" src="voice.mp3" preload="auto"></audio>
-  <a-asset-item id="model" src="avatar.glb"></a-asset-item>
-</a-assets>
+  <a-assets>
+    <a-asset-item id="model" src="avatar.glb"></a-asset-item>
+  </a-assets>
 
-<a-marker preset="hiro">
-  <a-entity
-    id="human"
-    gltf-model="#model"
-    position="0 0 0"
-    scale="1 1 1"
-    mouth-morph>
-  </a-entity>
-</a-marker>
+  <!-- MARKER -->
+  <a-marker preset="hiro">
 
-<a-entity camera></a-entity>
+    <!-- ТЕСТ КУБ (ЭНЭ ХАРАГДАЖ БАЙВАЛ MARKER OK) -->
+    <a-box position="0 0.5 0" color="red"></a-box>
+
+    <!-- 3D ХҮН -->
+    <a-entity
+      gltf-model="#model"
+      position="0 0 0"
+      scale="0.5 0.5 0.5"
+      rotation="0 180 0">
+    </a-entity>
+
+  </a-marker>
+
+  <a-entity camera></a-entity>
 </a-scene>
-
-<script>
-AFRAME.registerComponent('mouth-morph', {
-  init() {
-    const audio = document.querySelector('#voice');
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const src = ctx.createMediaElementSource(audio);
-    const analyser = ctx.createAnalyser();
-    analyser.fftSize = 256;
-    src.connect(analyser);
-    analyser.connect(ctx.destination);
-
-    let mesh = null;
-    let mouthIndex = -1;
-
-    this.el.addEventListener('model-loaded', () => {
-      this.el.getObject3D('mesh').traverse(o => {
-        if (o.morphTargetDictionary && o.morphTargetInfluences) {
-          if (o.morphTargetDictionary.mouthOpen !== undefined) {
-            mesh = o;
-            mouthIndex = o.morphTargetDictionary.mouthOpen;
-          }
-        }
-      });
-    });
-
-    const data = new Uint8Array(analyser.frequencyBinCount);
-
-    const animate = () => {
-      if (mesh && mouthIndex >= 0) {
-        analyser.getByteFrequencyData(data);
-        const v = data[10] / 255; // дууны хүч
-        mesh.morphTargetInfluences[mouthIndex] = v;
-      }
-      requestAnimationFrame(animate);
-    };
-
-    window.addEventListener('click', async () => {
-      await ctx.resume();
-      audio.play();
-      animate();
-    }, { once:true });
-  }
-});
-</script>
-
 </body>
 </html>
