@@ -97,6 +97,7 @@ AFRAME.registerComponent('viseme-lipsync', {
     };
     const clamp = v => Math.max(0, Math.min(1, v));
 
+    // Утасны AR дээр play хийх
     window.addEventListener('click', async () => {
       await ctx.resume();
       audio.play();
