@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AR LipSync - Fixed Pose</title>
+    <title>AR Avatar - Large & Natural</title>
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
@@ -15,19 +15,17 @@
             <audio id="voice" src="voice.mp3" preload="auto"></audio>
         </a-assets>
 
-        <a-entity id="avatar-parent" position="0 0 -3">
+        <a-entity id="avatar-parent" position="0 0 -3.5">
             <a-entity id="avatar"
                 gltf-model="avatar.glb"
-                scale="0.8 0.8 0.8"
-                position="0 -1.6 0" 
-                /* animation-mixer-г автоматаар ажиллуулахаар тохируулав */
-                animation-mixer="clip: *; loop: repeat"
+                scale="1.2 1.2 1.2"
+                position="0 -2 0" 
                 viseme-lipsync>
             </a-entity>
         </a-entity>
 
         <a-light type="ambient" intensity="1.2"></a-light>
-        <a-light type="directional" position="1 2 1" intensity="0.8"></a-light>
+        <a-light type="directional" position="1 2 1" intensity="1"></a-light>
         
         <a-entity camera></a-entity>
     </a-scene>
@@ -39,30 +37,45 @@ AFRAME.registerComponent('viseme-lipsync', {
         let ctx, analyser, data;
         let mesh, dict, infl;
 
-        // Модель ачаалагдах үед анимэйшн шалгах
         this.el.addEventListener('model-loaded', () => {
             const obj = this.el.getObject3D('mesh');
-            
-            // 1. Анимэйшн шалгах (A-pose-ийг болиулах)
+
+            // 1. Анимэйшн шалгах (Idle байгаа эсэх)
             if (obj.animations && obj.animations.length > 0) {
-                // Хэрэв "Idle" нэртэй анимэйшн байвал түүнийг, байхгүй бол 1 дэх анимэйшнийг тоглуулна
-                const idleAnim = obj.animations.find(a => a.name.includes('Idle')) || obj.animations[0];
+                let idleAnim = obj.animations.find(a => a.name.toLowerCase().includes('idle'));
+                if (!idleAnim) idleAnim = obj.animations[0];
+
                 this.el.setAttribute('animation-mixer', {
                     clip: idleAnim.name,
                     loop: 'repeat'
                 });
             }
 
-            // 2. Morph Targets (LipSync) олох
-            obj.traverse(n => {
-                if (n.morphTargetDictionary && n.morphTargetInfluences) {
-                    mesh = n;
-                    dict = n.morphTargetDictionary;
-                    infl = n.morphTargetInfluences;
+            // 2. ГАРЫГ ХҮЧЭЭР ДООШЛУУЛАХ (A-POSE ЗАСАХ)
+            obj.traverse(node => {
+                if (node.isBone) {
+                    const name = node.name.toLowerCase();
+                    // Зүүн гарны яснууд
+                    if (name.includes('leftarm') || name.includes('lupperarm') || name.includes('left_arm') || name.includes('l_shoulder')) {
+                        // 70 градус орчим доош нь (Radian-аар)
+                        node.rotation.z = 1.3; 
+                    }
+                    // Баруун гарны яснууд
+                    if (name.includes('rightarm') || name.includes('rupperarm') || name.includes('right_arm') || name.includes('r_shoulder')) {
+                        node.rotation.z = -1.3;
+                    }
+                }
+
+                // LipSync Morph олох
+                if (node.morphTargetDictionary && node.morphTargetInfluences) {
+                    mesh = node;
+                    dict = node.morphTargetDictionary;
+                    infl = node.morphTargetInfluences;
                 }
             });
         });
 
+        // LIP SYNC LOGIC
         const V = name => dict && dict[name] !== undefined ? dict[name] : -1;
         const vis = {
             aa: () => V('viseme_aa'), ee: () => V('viseme_E'),
@@ -76,26 +89,19 @@ AFRAME.registerComponent('viseme-lipsync', {
         const animate = () => {
             if (!analyser) return;
             analyser.getByteFrequencyData(data);
-            
             const avg = (a, b) => {
                 let s = 0, c = 0;
                 for (let i = a; i < b && i < data.length; i++) { s += data[i]; c++; }
                 return (s / c) / 255;
             };
             const clamp = v => Math.max(0, Math.min(1, v));
-
-            const low = avg(0, 200);
-            const mid = avg(200, 1200);
-            const high = avg(1200, 4000);
+            const low = avg(0, 200); const mid = avg(200, 1200);
 
             Object.values(vis).forEach(f => { const i = f(); if (i >= 0) infl[i] = 0; });
-
-            if (high < 0.02) smooth(vis.sil(), 1);
-            smooth(vis.aa(), clamp(low * 2.8));
-            smooth(vis.ee(), clamp(mid * 2.0));
-            smooth(vis.oo(), clamp(low * 2.4));
+            smooth(vis.aa(), clamp(low * 3.0));
             smooth(vis.open(), clamp(low * 3.0));
-
+            smooth(vis.ee(), clamp(mid * 2.0));
+            
             requestAnimationFrame(animate);
         };
 
