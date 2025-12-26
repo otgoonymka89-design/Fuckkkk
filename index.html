@@ -2,27 +2,26 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Viseme LipSync WebXR AR</title>
+  <title>Viseme LipSync AR</title>
   <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
 </head>
 <body style="margin:0">
   <a-scene
     xr="mode: immersive-ar"
     embedded
-    renderer="logarithmicDepthBuffer: true;"
     ar-hit-test
-    background="color: transparent">
+    background="color: transparent"
+    renderer="logarithmicDepthBuffer: true;">
 
     <a-assets>
       <a-asset-item id="avatarGLB" src="avatar.glb"></a-asset-item>
       <audio id="voice" src="voice.mp3" preload="auto"></audio>
     </a-assets>
 
-    <!-- AR-д гаргах 3D аватар -->
     <a-entity id="avatar"
               gltf-model="#avatarGLB"
-              position="0 0 0"
-              scale="0.5 0.5 0.5"
+              position="0 0 -1"
+              scale="0.3 0.3 0.3"
               viseme-lipsync>
     </a-entity>
 
@@ -32,86 +31,84 @@
     <a-camera></a-camera>
   </a-scene>
 
-  <script>
-    AFRAME.registerComponent('viseme-lipsync', {
-      init() {
-        const audio = document.querySelector('#voice');
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const src = ctx.createMediaElementSource(audio);
-        const analyser = ctx.createAnalyser();
-        analyser.fftSize = 2048;
-        src.connect(analyser);
-        analyser.connect(ctx.destination);
+<script>
+AFRAME.registerComponent('viseme-lipsync', {
+  init() {
+    const audio = document.querySelector('#voice');
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = ctx.createMediaElementSource(audio);
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 2048;
+    src.connect(analyser);
+    analyser.connect(ctx.destination);
 
-        const data = new Uint8Array(analyser.frequencyBinCount);
+    const data = new Uint8Array(analyser.frequencyBinCount);
 
-        let mesh, dict, infl, mixer, clock;
-        this.el.addEventListener('model-loaded', () => {
-          this.el.getObject3D('mesh').traverse(n => {
-            if (n.morphTargetDictionary && n.morphTargetInfluences) {
-              mesh = n;
-              dict = n.morphTargetDictionary;
-              infl = n.morphTargetInfluences;
-            }
-          });
-
-          const model = this.el.getObject3D('mesh');
-          if (model.animations && model.animations.length > 0) {
-            mixer = new THREE.AnimationMixer(model);
-            model.animations.forEach(clip => {
-              mixer.clipAction(clip).play();
-            });
-            clock = new THREE.Clock();
-          }
+    let mesh, dict, infl, mixer, clock;
+    this.el.addEventListener('model-loaded', () => {
+      this.el.getObject3D('mesh').traverse(n => {
+        if (n.morphTargetDictionary && n.morphTargetInfluences) {
+          mesh = n;
+          dict = n.morphTargetDictionary;
+          infl = n.morphTargetInfluences;
+        }
+      });
+      const model = this.el.getObject3D('mesh');
+      if (model.animations && model.animations.length > 0) {
+        mixer = new THREE.AnimationMixer(model);
+        model.animations.forEach(clip => {
+          mixer.clipAction(clip).play();
         });
-
-        const V = name => dict && dict[name] !== undefined ? dict[name] : -1;
-        const vis = {
-          aa: () => V('viseme_aa'),
-          ee: () => V('viseme_E'),
-          ii: () => V('viseme_I'),
-          oo: () => V('viseme_O'),
-          uu: () => V('viseme_U'),
-          sil: () => V('viseme_sil'),
-          open: () => V('mouthOpen')
-        };
-        const smooth = (i,v)=>{ if(i>=0) infl[i] = infl[i]*0.6 + v*0.4; };
-
-        const animate = () => {
-          analyser.getByteFrequencyData(data);
-          const low = avg(0,200);
-          const mid = avg(200,1200);
-          const high = avg(1200,4000);
-
-          Object.values(vis).forEach(f => { const i=f(); if(i>=0) infl[i]=0; });
-
-          if(high<0.02) smooth(vis.sil(),1);
-          smooth(vis.aa(), clamp(low*1.8));
-          smooth(vis.ee(), clamp(mid*1.4));
-          smooth(vis.ii(), clamp(mid*1.2));
-          smooth(vis.oo(), clamp(low*1.2));
-          smooth(vis.uu(), clamp(low));
-          smooth(vis.open(), clamp(low*1.6));
-
-          if(mixer && clock) mixer.update(clock.getDelta());
-
-          requestAnimationFrame(animate);
-        };
-
-        const avg = (a,b)=>{
-          let s=0,c=0;
-          for(let i=a;i<b&&i<data.length;i++){ s+=data[i]; c++; }
-          return (s/c)/255;
-        };
-        const clamp = v=>Math.max(0,Math.min(1,v));
-
-        window.addEventListener('click', async()=>{
-          await ctx.resume();
-          audio.play();
-          animate();
-        },{once:true});
+        clock = new THREE.Clock();
       }
     });
-  </script>
+
+    const V = name => dict && dict[name] !== undefined ? dict[name] : -1;
+    const vis = {
+      aa: () => V('viseme_aa'),
+      ee: () => V('viseme_E'),
+      ii: () => V('viseme_I'),
+      oo: () => V('viseme_O'),
+      uu: () => V('viseme_U'),
+      sil: () => V('viseme_sil'),
+      open: () => V('mouthOpen')
+    };
+    const smooth = (i,v)=>{ if(i>=0) infl[i]=infl[i]*0.6+v*0.4; };
+    const clamp = v=>Math.max(0,Math.min(1,v));
+    const avg = (a,b)=>{
+      let s=0,c=0;
+      for(let i=a;i<b && i<data.length;i++){ s+=data[i]; c++; }
+      return (s/c)/255;
+    };
+
+    const animate = ()=>{
+      analyser.getByteFrequencyData(data);
+      const low=avg(0,200);
+      const mid=avg(200,1200);
+      const high=avg(1200,4000);
+
+      Object.values(vis).forEach(f=>{ const i=f(); if(i>=0) infl[i]=0; });
+
+      if(high<0.02) smooth(vis.sil(),1);
+      smooth(vis.aa(),clamp(low*1.8));
+      smooth(vis.ee(),clamp(mid*1.4));
+      smooth(vis.ii(),clamp(mid*1.2));
+      smooth(vis.oo(),clamp(low*1.2));
+      smooth(vis.uu(),clamp(low));
+      smooth(vis.open(),clamp(low*1.6));
+
+      if(mixer && clock) mixer.update(clock.getDelta());
+
+      requestAnimationFrame(animate);
+    };
+
+    window.addEventListener('click', async()=>{
+      await ctx.resume();
+      audio.play();
+      animate();
+    },{once:true});
+  }
+});
+</script>
 </body>
 </html>
