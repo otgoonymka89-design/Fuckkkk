@@ -3,7 +3,9 @@
 <head>
   <meta charset="utf-8">
   <title>Viseme LipSync AR</title>
+  <!-- A-Frame -->
   <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+  <!-- AR.js -->
   <script src="https://cdn.jsdelivr.net/npm/aframe-ar@1.8.0/dist/aframe-ar.min.js"></script>
 </head>
 
@@ -18,18 +20,18 @@
     <a-asset-item id="avatarGLB" src="avatar.glb"></a-asset-item>
   </a-assets>
 
-  <!-- AR дээр гарах 3D хүн -->
+  <!-- AR дээр гаргах 3D аватар -->
   <a-entity id="avatar"
             gltf-model="#avatarGLB"
-            position="0 0 0"
-            scale="1 1 1"
+            position="0 0 -1"
+            scale="0.5 0.5 0.5"
             viseme-lipsync>
   </a-entity>
 
   <a-light type="ambient" intensity="1"></a-light>
   <a-light type="directional" position="1 2 1"></a-light>
 
-  <!-- Camera нь AR-д хэрэгтэй -->
+  <!-- Camera -->
   <a-camera position="0 1.6 0" look-controls="enabled: false"></a-camera>
 </a-scene>
 
@@ -48,7 +50,7 @@ AFRAME.registerComponent('viseme-lipsync', {
 
     let mesh, dict, infl, mixer, clock;
     this.el.addEventListener('model-loaded', () => {
-      // Morph target-ийг авах
+      // Morph target-г авах
       this.el.getObject3D('mesh').traverse(n => {
         if (n.morphTargetDictionary && n.morphTargetInfluences) {
           mesh = n;
@@ -67,6 +69,10 @@ AFRAME.registerComponent('viseme-lipsync', {
         });
         clock = new THREE.Clock();
       }
+
+      // Model position & scale тохируулах
+      this.el.setAttribute('position', '0 0 -1');
+      this.el.setAttribute('scale', '0.5 0.5 0.5');
     });
 
     const V = name => dict && dict[name] !== undefined ? dict[name] : -1;
@@ -97,9 +103,7 @@ AFRAME.registerComponent('viseme-lipsync', {
       smooth(vis.uu(), clamp(low));
       smooth(vis.open(), clamp(low*1.6));
 
-      if (mixer && clock) {
-        mixer.update(clock.getDelta());
-      }
+      if (mixer && clock) mixer.update(clock.getDelta());
 
       requestAnimationFrame(animate);
     };
@@ -122,4 +126,3 @@ AFRAME.registerComponent('viseme-lipsync', {
 </script>
 </body>
 </html>
-
