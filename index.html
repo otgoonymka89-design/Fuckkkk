@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AR LipSync - Direct View</title>
+    <title>AR LipSync - Fixed Pose</title>
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
@@ -20,13 +20,14 @@
                 gltf-model="avatar.glb"
                 scale="0.8 0.8 0.8"
                 position="0 -1.6 0" 
-                animation-mixer="clip: Idle; loop: repeat; repetitions: Infinity"
+                /* animation-mixer-г автоматаар ажиллуулахаар тохируулав */
+                animation-mixer="clip: *; loop: repeat"
                 viseme-lipsync>
             </a-entity>
         </a-entity>
 
-        <a-light type="ambient" intensity="1"></a-light>
-        <a-light type="directional" position="1 2 1"></a-light>
+        <a-light type="ambient" intensity="1.2"></a-light>
+        <a-light type="directional" position="1 2 1" intensity="0.8"></a-light>
         
         <a-entity camera></a-entity>
     </a-scene>
@@ -38,8 +39,22 @@ AFRAME.registerComponent('viseme-lipsync', {
         let ctx, analyser, data;
         let mesh, dict, infl;
 
+        // Модель ачаалагдах үед анимэйшн шалгах
         this.el.addEventListener('model-loaded', () => {
-            this.el.getObject3D('mesh').traverse(n => {
+            const obj = this.el.getObject3D('mesh');
+            
+            // 1. Анимэйшн шалгах (A-pose-ийг болиулах)
+            if (obj.animations && obj.animations.length > 0) {
+                // Хэрэв "Idle" нэртэй анимэйшн байвал түүнийг, байхгүй бол 1 дэх анимэйшнийг тоглуулна
+                const idleAnim = obj.animations.find(a => a.name.includes('Idle')) || obj.animations[0];
+                this.el.setAttribute('animation-mixer', {
+                    clip: idleAnim.name,
+                    loop: 'repeat'
+                });
+            }
+
+            // 2. Morph Targets (LipSync) олох
+            obj.traverse(n => {
                 if (n.morphTargetDictionary && n.morphTargetInfluences) {
                     mesh = n;
                     dict = n.morphTargetDictionary;
@@ -50,12 +65,9 @@ AFRAME.registerComponent('viseme-lipsync', {
 
         const V = name => dict && dict[name] !== undefined ? dict[name] : -1;
         const vis = {
-            aa: () => V('viseme_aa'),
-            ee: () => V('viseme_E'),
-            ii: () => V('viseme_I'),
-            oo: () => V('viseme_O'),
-            uu: () => V('viseme_U'),
-            sil: () => V('viseme_sil'),
+            aa: () => V('viseme_aa'), ee: () => V('viseme_E'),
+            ii: () => V('viseme_I'), oo: () => V('viseme_O'),
+            uu: () => V('viseme_U'), sil: () => V('viseme_sil'),
             open: () => V('mouthOpen')
         };
 
@@ -76,7 +88,6 @@ AFRAME.registerComponent('viseme-lipsync', {
             const mid = avg(200, 1200);
             const high = avg(1200, 4000);
 
-            // Morph-ийг шинэчлэх
             Object.values(vis).forEach(f => { const i = f(); if (i >= 0) infl[i] = 0; });
 
             if (high < 0.02) smooth(vis.sil(), 1);
@@ -88,7 +99,6 @@ AFRAME.registerComponent('viseme-lipsync', {
             requestAnimationFrame(animate);
         };
 
-        // Хэрэглэгч дэлгэц дээр дарахад ажиллана
         window.addEventListener('click', async () => {
             if (!ctx) {
                 ctx = new (window.AudioContext || window.webkitAudioContext)();
