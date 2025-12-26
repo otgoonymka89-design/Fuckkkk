@@ -2,34 +2,36 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Viseme LipSync AR</title>
+  <title>AR Talking Human</title>
+
   <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
 </head>
-<body style="margin:0">
-  <a-scene
-    xr="mode: immersive-ar"
-    embedded
-    ar-hit-test
-    background="color: transparent"
-    renderer="logarithmicDepthBuffer: true;">
 
-    <a-assets>
-      <a-asset-item id="avatarGLB" src="avatar.glb"></a-asset-item>
-      <audio id="voice" src="voice.mp3" preload="auto"></audio>
-    </a-assets>
+<body style="margin:0; overflow:hidden;">
+<a-scene
+  embedded
+  arjs="sourceType: webcam; debugUIEnabled: false;">
 
-    <a-entity id="avatar"
-              gltf-model="#avatarGLB"
-              position="0 0 -1"
-              scale="0.3 0.3 0.3"
-              viseme-lipsync>
+  <a-assets>
+    <a-asset-item id="avatarGLB" src="avatar.glb"></a-asset-item>
+    <audio id="voice" src="voice.mp3" preload="auto"></audio>
+  </a-assets>
+
+  <!-- HIRO MARKER -->
+  <a-marker preset="hiro">
+    <a-entity
+      id="avatar"
+      gltf-model="#avatarGLB"
+      position="0 0 0"
+      scale="0.3 0.3 0.3"
+      rotation="0 180 0"
+      viseme-lipsync>
     </a-entity>
+  </a-marker>
 
-    <a-light type="ambient" intensity="1"></a-light>
-    <a-light type="directional" position="1 2 1"></a-light>
-
-    <a-camera></a-camera>
-  </a-scene>
+  <a-entity camera></a-entity>
+</a-scene>
 
 <script>
 AFRAME.registerComponent('viseme-lipsync', {
@@ -44,38 +46,21 @@ AFRAME.registerComponent('viseme-lipsync', {
 
     const data = new Uint8Array(analyser.frequencyBinCount);
 
-    let mesh, dict, infl, mixer, clock;
+    let dict, infl;
+
     this.el.addEventListener('model-loaded', () => {
       this.el.getObject3D('mesh').traverse(n => {
-        if (n.morphTargetDictionary && n.morphTargetInfluences) {
-          mesh = n;
+        if (n.morphTargetDictionary) {
           dict = n.morphTargetDictionary;
           infl = n.morphTargetInfluences;
         }
       });
-      const model = this.el.getObject3D('mesh');
-      if (model.animations && model.animations.length > 0) {
-        mixer = new THREE.AnimationMixer(model);
-        model.animations.forEach(clip => {
-          mixer.clipAction(clip).play();
-        });
-        clock = new THREE.Clock();
-      }
     });
 
-    const V = name => dict && dict[name] !== undefined ? dict[name] : -1;
-    const vis = {
-      aa: () => V('viseme_aa'),
-      ee: () => V('viseme_E'),
-      ii: () => V('viseme_I'),
-      oo: () => V('viseme_O'),
-      uu: () => V('viseme_U'),
-      sil: () => V('viseme_sil'),
-      open: () => V('mouthOpen')
-    };
+    const V = n => dict && dict[n] !== undefined ? dict[n] : -1;
     const smooth = (i,v)=>{ if(i>=0) infl[i]=infl[i]*0.6+v*0.4; };
     const clamp = v=>Math.max(0,Math.min(1,v));
-    const avg = (a,b)=>{
+    const avg=(a,b)=>{
       let s=0,c=0;
       for(let i=a;i<b && i<data.length;i++){ s+=data[i]; c++; }
       return (s/c)/255;
@@ -85,19 +70,12 @@ AFRAME.registerComponent('viseme-lipsync', {
       analyser.getByteFrequencyData(data);
       const low=avg(0,200);
       const mid=avg(200,1200);
-      const high=avg(1200,4000);
 
-      Object.values(vis).forEach(f=>{ const i=f(); if(i>=0) infl[i]=0; });
+      infl && infl.fill(0);
 
-      if(high<0.02) smooth(vis.sil(),1);
-      smooth(vis.aa(),clamp(low*1.8));
-      smooth(vis.ee(),clamp(mid*1.4));
-      smooth(vis.ii(),clamp(mid*1.2));
-      smooth(vis.oo(),clamp(low*1.2));
-      smooth(vis.uu(),clamp(low));
-      smooth(vis.open(),clamp(low*1.6));
-
-      if(mixer && clock) mixer.update(clock.getDelta());
+      smooth(V('viseme_aa'), clamp(low*1.5));
+      smooth(V('viseme_E'), clamp(mid*1.2));
+      smooth(V('mouthOpen'), clamp(low*1.8));
 
       requestAnimationFrame(animate);
     };
