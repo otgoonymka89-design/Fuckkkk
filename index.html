@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AR Avatar - Original Pose</title>
+    <title>AR Avatar - Correct Arms Fix</title>
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
@@ -19,7 +19,7 @@
             <a-entity id="avatar"
                 gltf-model="avatar.glb"
                 scale="1.3 1.3 1.3"
-                position="0 -1.8 0" 
+                position="0 -2 0" 
                 viseme-lipsync>
             </a-entity>
         </a-entity>
@@ -39,21 +39,39 @@ AFRAME.registerComponent('viseme-lipsync', {
         this.el.addEventListener('model-loaded', () => {
             const obj = this.el.getObject3D('mesh');
             
-            // Бүх анимэйшн болон кодоор хийсэн эргэлтийг бүрэн устгав
-            // Ингэснээр модель анхны (A-pose) файл дээрх шигээ харагдана
+            // Анимэйшн гарыг хөдөлгөхөөс сэргийлж устгана
             this.el.removeAttribute('animation-mixer');
 
             obj.traverse(node => {
-                // Зөвхөн LipSync Morph-ийг олж авна
+                if (node.isBone) {
+                    const name = node.name.toLowerCase();
+                    
+                    // Гарыг байгалийн байдлаар доош нь унжуулах (Ready Player Me / Mixamo)
+                    if (name.includes('arm') || name.includes('upperarm')) {
+                        node.rotation.set(0, 0, 0); // Тэнхлэгийг тэглэх
+                        
+                        if (name.includes('left')) {
+                            // Z тэнхлэгийг 1.4 болгосноор гар хажуу тийшээ зөв бууна
+                            node.rotation.z = 1.4; 
+                            node.rotation.x = 0; 
+                            node.rotation.y = 0;
+                        }
+                        if (name.includes('right')) {
+                            // Баруун гарыг эсрэг чиглэлд
+                            node.rotation.z = -1.4;
+                            node.rotation.x = 0;
+                            node.rotation.y = 0;
+                        }
+                    }
+                }
+
                 if (node.morphTargetDictionary && node.morphTargetInfluences) {
-                    mesh = node; 
-                    dict = node.morphTargetDictionary; 
-                    infl = node.morphTargetInfluences;
+                    mesh = node; dict = node.morphTargetDictionary; infl = node.morphTargetInfluences;
                 }
             });
         });
 
-        // LIP SYNC LOGIC (Хэвээрээ ажиллана)
+        // LIP SYNC LOGIC
         const V = name => dict && dict[name] !== undefined ? dict[name] : -1;
         const vis = {
             aa: () => V('viseme_aa'),
@@ -75,7 +93,6 @@ AFRAME.registerComponent('viseme-lipsync', {
                 return (s / c) / 255;
             };
             const low = avg(0, 200); const mid = avg(200, 1200);
-            
             Object.values(vis).forEach(f => { const i = f(); if (i >= 0) infl[i] = 0; });
             smooth(vis.aa(), Math.min(1, low * 3.5));
             smooth(vis.open(), Math.min(1, low * 3.0));
