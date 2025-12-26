@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Viseme LipSync + Idle + AR</title>
+  <title>AR LipSync Avatar</title>
   <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
@@ -15,17 +15,18 @@
     <a-asset-item id="avatarModel" src="avatar.glb"></a-asset-item>
   </a-assets>
 
-  <!-- QR Marker дээр avatar -->
+  <!-- Marker дээр avatar -->
   <a-marker preset="hiro">
     <a-entity id="avatar"
       gltf-model="#avatarModel"
-      scale="1 1 1"
+      scale="0.5 0.5 0.5"
+      position="0 0 0"
+      rotation="0 180 0"
       animation-mixer="clip: Idle; loop: repeat"
       viseme-lipsync>
     </a-entity>
   </a-marker>
 
-  <!-- Утасны камер -->
   <a-entity camera></a-entity>
 </a-scene>
 
