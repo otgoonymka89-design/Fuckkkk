@@ -2,9 +2,9 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Viseme LipSync AR Mode</title>
+    <title>Web AR - Direct View</title>
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
 </head>
 
@@ -14,17 +14,16 @@
             <audio id="voice" src="voice.mp3" preload="auto"></audio>
         </a-assets>
 
-        <a-marker preset="hiro">
-            <a-entity id="avatar"
-                gltf-model="avatar.glb"
-                position="0 0 0"
-                scale="0.5 0.5 0.5"
-                animation-mixer="clip: Idle; loop: repeat"
-                viseme-lipsync>
-            </a-entity>
-        </a-marker>
+        <a-entity id="avatar"
+            gltf-model="avatar.glb"
+            scale="2 2 2"
+            gps-entity-place="latitude: 0; longitude: 0;" 
+            position="0 0 -5"
+            animation-mixer="clip: Idle; loop: repeat"
+            viseme-lipsync>
+        </a-entity>
 
-        <a-entity camera></a-entity>
+        <a-camera gps-camera rotation-reader></a-camera>
         
         <a-light type="ambient" intensity="1"></a-light>
         <a-light type="directional" position="1 2 1"></a-light>
@@ -33,9 +32,9 @@
 <script>
 AFRAME.registerComponent('viseme-lipsync', {
     init() {
+        // Таны өмнөх Lipsync логик хэвээрээ
         const audio = document.querySelector('#voice');
-        // AudioContext-ийг эхлүүлэх (хэрэглэгч дэлгэц дээр дарахад)
-        let ctx;
+        let ctx, analyser, data;
         
         let mesh, dict, infl;
         this.el.addEventListener('model-loaded', () => {
@@ -50,18 +49,16 @@ AFRAME.registerComponent('viseme-lipsync', {
 
         const V = name => dict && dict[name] !== undefined ? dict[name] : -1;
         const vis = {
-            aa: () => V('viseme_aa'),
-            ee: () => V('viseme_E'),
-            ii: () => V('viseme_I'),
-            oo: () => V('viseme_O'),
-            uu: () => V('viseme_U'),
-            sil: () => V('viseme_sil'),
+            aa: () => V('viseme_aa'), ee: () => V('viseme_E'),
+            ii: () => V('viseme_I'), oo: () => V('viseme_O'),
+            uu: () => V('viseme_U'), sil: () => V('viseme_sil'),
             open: () => V('mouthOpen')
         };
 
         const smooth = (i, v) => { if (i >= 0) infl[i] = infl[i]*0.6 + v*0.4; };
 
-        const animate = (analyser, data) => {
+        const animate = () => {
+            if (!analyser) return;
             analyser.getByteFrequencyData(data);
             
             const avg = (a,b) => {
@@ -75,7 +72,6 @@ AFRAME.registerComponent('viseme-lipsync', {
             const mid = avg(200, 1200);
             const high = avg(1200, 4000);
 
-            // reset
             Object.values(vis).forEach(f => { const i=f(); if(i>=0) infl[i]=0; });
 
             if (high < 0.02) smooth(vis.sil(), 1);
@@ -86,23 +82,23 @@ AFRAME.registerComponent('viseme-lipsync', {
             smooth(vis.uu(), clamp(low*2.0));
             smooth(vis.open(), clamp(low*2.8));
 
-            requestAnimationFrame(() => animate(analyser, data));
+            requestAnimationFrame(animate);
         };
 
+        // Дэлгэц дээр дарахад дуу тоглон ам нь хөдөлнө
         window.addEventListener('click', async () => {
             if (!ctx) {
                 ctx = new (window.AudioContext || window.webkitAudioContext)();
                 const src = ctx.createMediaElementSource(audio);
-                const analyser = ctx.createAnalyser();
+                analyser = ctx.createAnalyser();
                 analyser.fftSize = 2048;
                 src.connect(analyser);
                 analyser.connect(ctx.destination);
-                const data = new Uint8Array(analyser.frequencyBinCount);
-                
-                await ctx.resume();
-                audio.play();
-                animate(analyser, data);
+                data = new Uint8Array(analyser.frequencyBinCount);
             }
+            await ctx.resume();
+            audio.play();
+            animate();
         }, { once: true });
     }
 });
