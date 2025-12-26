@@ -2,42 +2,49 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Web AR - Direct View</title>
-    <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fixed AR Avatar</title>
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.0/dist/mindar-image-aframe.prod.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
 </head>
 
 <body style="margin: 0; overflow: hidden;">
-    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
+    <a-scene mindar-image="imageTargetSrc: ; autoStart: true; uiLoading: no; uiScanning: no;" 
+             embedded color-space="sRGB" 
+             renderer="colorManagement: true, physicallyCorrectLights: true" 
+             vr-mode-ui="enabled: false" 
+             device-orientation-permission-ui="enabled: false">
+        
         <a-assets>
             <audio id="voice" src="voice.mp3" preload="auto"></audio>
         </a-assets>
 
-        <a-entity id="avatar"
-            gltf-model="avatar.glb"
-            scale="2 2 2"
-            gps-entity-place="latitude: 0; longitude: 0;" 
-            position="0 0 -5"
-            animation-mixer="clip: Idle; loop: repeat"
-            viseme-lipsync>
+        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+        <a-entity id="avatar-container" position="0 -1.5 -3">
+            <a-entity id="avatar"
+                gltf-model="avatar.glb"
+                scale="1.5 1.5 1.5"
+                rotation="0 0 0"
+                animation-mixer="clip: Idle; loop: repeat; timeScale: 1"
+                viseme-lipsync>
+            </a-entity>
         </a-entity>
 
-        <a-camera gps-camera rotation-reader></a-camera>
-        
-        <a-light type="ambient" intensity="1"></a-light>
-        <a-light type="directional" position="1 2 1"></a-light>
+        <a-light type="ambient" intensity="0.8"></a-light>
+        <a-light type="directional" position="1 2 2" intensity="1"></a-light>
     </a-scene>
 
 <script>
 AFRAME.registerComponent('viseme-lipsync', {
     init() {
-        // Таны өмнөх Lipsync логик хэвээрээ
         const audio = document.querySelector('#voice');
         let ctx, analyser, data;
         
         let mesh, dict, infl;
         this.el.addEventListener('model-loaded', () => {
+            // Моделийг ачаалахад бүх хэсгийг шалгаж Morph Target-ийг олно
             this.el.getObject3D('mesh').traverse(n => {
                 if (n.morphTargetDictionary && n.morphTargetInfluences) {
                     mesh = n;
@@ -47,51 +54,60 @@ AFRAME.registerComponent('viseme-lipsync', {
             });
         });
 
-        const V = name => dict && dict[name] !== undefined ? dict[name] : -1;
+        const V = name => (dict && dict[name] !== undefined) ? dict[name] : -1;
+
         const vis = {
-            aa: () => V('viseme_aa'), ee: () => V('viseme_E'),
-            ii: () => V('viseme_I'), oo: () => V('viseme_O'),
-            uu: () => V('viseme_U'), sil: () => V('viseme_sil'),
+            aa: () => V('viseme_aa'),
+            ee: () => V('viseme_E'),
+            ii: () => V('viseme_I'),
+            oo: () => V('viseme_O'),
+            uu: () => V('viseme_U'),
+            sil: () => V('viseme_sil'),
             open: () => V('mouthOpen')
         };
 
-        const smooth = (i, v) => { if (i >= 0) infl[i] = infl[i]*0.6 + v*0.4; };
+        const smooth = (i, v) => { if (i >= 0) infl[i] = (infl[i] || 0) * 0.4 + v * 0.6; };
 
         const animate = () => {
             if (!analyser) return;
             analyser.getByteFrequencyData(data);
             
-            const avg = (a,b) => {
-                let s=0,c=0;
-                for(let i=a;i<b && i<data.length;i++){ s+=data[i]; c++; }
-                return (s/c)/255;
+            const avg = (a, b) => {
+                let s = 0, c = 0;
+                for (let i = a; i < b && i < data.length; i++) { s += data[i]; c++; }
+                return (s / c) / 255;
             };
-            const clamp = v => Math.max(0, Math.min(1, v));
 
             const low = avg(0, 200);
-            const mid = avg(200, 1200);
-            const high = avg(1200, 4000);
+            const mid = avg(200, 1000);
+            const high = avg(1000, 3000);
 
-            Object.values(vis).forEach(f => { const i=f(); if(i>=0) infl[i]=0; });
+            // Бүх morph-ийг 0 болгож шинэчлэх
+            Object.values(vis).forEach(f => { 
+                const i = f(); 
+                if (i >= 0) infl[i] = 0; 
+            });
 
-            if (high < 0.02) smooth(vis.sil(), 1);
-            smooth(vis.aa(), clamp(low*2.6));
-            smooth(vis.ee(), clamp(mid*1.8));
-            smooth(vis.ii(), clamp(mid*1.6));
-            smooth(vis.oo(), clamp(low*2.2));
-            smooth(vis.uu(), clamp(low*2.0));
-            smooth(vis.open(), clamp(low*2.8));
+            // Дууны давтамжаар амыг хөдөлгөх
+            if (low > 0.01) {
+                smooth(vis.aa(), Math.min(1, low * 3));
+                smooth(vis.open(), Math.min(1, low * 2.5));
+            }
+            if (mid > 0.01) {
+                smooth(vis.ee(), Math.min(1, mid * 2));
+                smooth(vis.ii(), Math.min(1, mid * 2));
+            }
 
             requestAnimationFrame(animate);
         };
 
-        // Дэлгэц дээр дарахад дуу тоглон ам нь хөдөлнө
+        // Дэлгэц дээр нэг удаа дарахад "Idle" анимэйшн болон дуу эхэлнэ
         window.addEventListener('click', async () => {
             if (!ctx) {
                 ctx = new (window.AudioContext || window.webkitAudioContext)();
                 const src = ctx.createMediaElementSource(audio);
                 analyser = ctx.createAnalyser();
-                analyser.fftSize = 2048;
+                analyser.fftSize = 512;
                 src.connect(analyser);
                 analyser.connect(ctx.destination);
                 data = new Uint8Array(analyser.frequencyBinCount);
