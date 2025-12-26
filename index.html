@@ -2,30 +2,31 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Viseme LipSync + Idle</title>
+  <title>Viseme LipSync + Idle + AR</title>
   <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar.js"></script>
 </head>
 
-<body style="margin:0">
-<a-scene>
+<body style="margin:0; overflow:hidden;">
+<a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
   <a-assets>
     <audio id="voice" src="voice.mp3" preload="auto"></audio>
+    <a-asset-item id="avatarModel" src="avatar.glb"></a-asset-item>
   </a-assets>
 
-  <!-- Avatar with Idle + Viseme LipSync -->
-  <a-entity id="avatar"
-    gltf-model="avatar.glb"
-    position="0 0 -2"
-    scale="1 1 1"
-    animation-mixer="clip: Idle; loop: repeat"
-    viseme-lipsync>
-  </a-entity>
+  <!-- QR Marker дээр avatar -->
+  <a-marker preset="hiro">
+    <a-entity id="avatar"
+      gltf-model="#avatarModel"
+      scale="1 1 1"
+      animation-mixer="clip: Idle; loop: repeat"
+      viseme-lipsync>
+    </a-entity>
+  </a-marker>
 
-  <!-- Lights & Camera -->
-  <a-light type="ambient" intensity="1"></a-light>
-  <a-light type="directional" position="1 2 1"></a-light>
-  <a-camera position="0 1.6 0"></a-camera>
+  <!-- Утасны камер -->
+  <a-entity camera></a-entity>
 </a-scene>
 
 <script>
@@ -43,7 +44,9 @@ AFRAME.registerComponent('viseme-lipsync', {
 
     let mesh, dict, infl;
     this.el.addEventListener('model-loaded', () => {
-      this.el.getObject3D('mesh').traverse(n => {
+      const obj = this.el.getObject3D('mesh') || this.el.getObject3D('scene');
+      if (!obj) return;
+      obj.traverse(n => {
         if (n.morphTargetDictionary && n.morphTargetInfluences) {
           mesh = n;
           dict = n.morphTargetDictionary;
@@ -67,15 +70,14 @@ AFRAME.registerComponent('viseme-lipsync', {
     const smooth = (i, v) => { if (i >= 0) infl[i] = infl[i]*0.6 + v*0.4; };
 
     const animate = () => {
+      if (!infl) { requestAnimationFrame(animate); return; }
       analyser.getByteFrequencyData(data);
-      const low = avg(0, 200);     // aa / oo
-      const mid = avg(200, 1200);  // ee / ii
-      const high = avg(1200, 4000);// ss / silence
+      const low = avg(0, 200);
+      const mid = avg(200, 1200);
+      const high = avg(1200, 4000);
 
-      // reset
       Object.values(vis).forEach(f => { const i=f(); if(i>=0) infl[i]=0; });
 
-      // viseme lip-sync (монголд тааруулсан)
       if (high < 0.02) smooth(vis.sil(), 1);
       smooth(vis.aa(), clamp(low*2.6));
       smooth(vis.ee(), clamp(mid*1.8));
@@ -94,7 +96,6 @@ AFRAME.registerComponent('viseme-lipsync', {
     };
     const clamp = v => Math.max(0, Math.min(1, v));
 
-    // click to start
     window.addEventListener('click', async () => {
       await ctx.resume();
       audio.play();
