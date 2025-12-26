@@ -2,26 +2,35 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Viseme LipSync</title>
+  <title>Viseme LipSync AR</title>
   <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/aframe-ar@1.8.0/dist/aframe-ar.min.js"></script>
 </head>
 
 <body style="margin:0">
-<a-scene>
+<a-scene
+    embedded
+    arjs="sourceType: webcam; debugUIEnabled: false;"
+    renderer="logarithmicDepthBuffer: true;">
+
   <a-assets>
     <audio id="voice" src="voice.mp3" preload="auto"></audio>
+    <a-asset-item id="avatarGLB" src="avatar.glb"></a-asset-item>
   </a-assets>
 
+  <!-- AR дээр гарах 3D хүн -->
   <a-entity id="avatar"
-    gltf-model="avatar.glb"
-    position="0 0 -2"
-    scale="1 1 1"
-    viseme-lipsync>
+            gltf-model="#avatarGLB"
+            position="0 0 0"
+            scale="1 1 1"
+            viseme-lipsync>
   </a-entity>
 
   <a-light type="ambient" intensity="1"></a-light>
   <a-light type="directional" position="1 2 1"></a-light>
-  <a-camera position="0 1.6 0"></a-camera>
+
+  <!-- Camera нь AR-д хэрэгтэй -->
+  <a-camera position="0 1.6 0" look-controls="enabled: false"></a-camera>
 </a-scene>
 
 <script>
@@ -37,8 +46,9 @@ AFRAME.registerComponent('viseme-lipsync', {
 
     const data = new Uint8Array(analyser.frequencyBinCount);
 
-    let mesh, dict, infl;
+    let mesh, dict, infl, mixer, clock;
     this.el.addEventListener('model-loaded', () => {
+      // Morph target-ийг авах
       this.el.getObject3D('mesh').traverse(n => {
         if (n.morphTargetDictionary && n.morphTargetInfluences) {
           mesh = n;
@@ -46,10 +56,20 @@ AFRAME.registerComponent('viseme-lipsync', {
           infl = n.morphTargetInfluences;
         }
       });
+
+      // Animation-г идэвхжүүлэх
+      const model = this.el.getObject3D('mesh');
+      if (model.animations && model.animations.length > 0) {
+        mixer = new THREE.AnimationMixer(model);
+        model.animations.forEach(clip => {
+          const action = mixer.clipAction(clip);
+          action.play();
+        });
+        clock = new THREE.Clock();
+      }
     });
 
     const V = name => dict && dict[name] !== undefined ? dict[name] : -1;
-
     const vis = {
       aa: () => V('viseme_aa'),
       ee: () => V('viseme_E'),
@@ -59,16 +79,14 @@ AFRAME.registerComponent('viseme-lipsync', {
       sil: () => V('viseme_sil'),
       open: () => V('mouthOpen')
     };
-
     const smooth = (i, v) => { if (i >= 0) infl[i] = infl[i]*0.6 + v*0.4; };
 
     const animate = () => {
       analyser.getByteFrequencyData(data);
-      const low = avg(0, 200);     // aa / oo
-      const mid = avg(200, 1200);  // ee / ii
-      const high = avg(1200, 4000);// ss / silence
+      const low = avg(0, 200);
+      const mid = avg(200, 1200);
+      const high = avg(1200, 4000);
 
-      // reset
       Object.values(vis).forEach(f => { const i=f(); if(i>=0) infl[i]=0; });
 
       if (high < 0.02) smooth(vis.sil(), 1);
@@ -78,6 +96,10 @@ AFRAME.registerComponent('viseme-lipsync', {
       smooth(vis.oo(), clamp(low*1.2));
       smooth(vis.uu(), clamp(low));
       smooth(vis.open(), clamp(low*1.6));
+
+      if (mixer && clock) {
+        mixer.update(clock.getDelta());
+      }
 
       requestAnimationFrame(animate);
     };
@@ -89,7 +111,7 @@ AFRAME.registerComponent('viseme-lipsync', {
     };
     const clamp = v => Math.max(0, Math.min(1, v));
 
-    // click to start (browser policy)
+    // Click to start audio + animate
     window.addEventListener('click', async () => {
       await ctx.resume();
       audio.play();
@@ -99,5 +121,5 @@ AFRAME.registerComponent('viseme-lipsync', {
 });
 </script>
 </body>
-
 </html>
+
