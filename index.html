@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AR Avatar - Found & Fixed</title>
+    <title>AR Avatar - Final Fix</title>
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
@@ -15,10 +15,10 @@
             <audio id="voice" src="voice.mp3" preload="auto"></audio>
         </a-assets>
 
-        <a-entity id="avatar-parent" position="0 -1.8 -3">
+        <a-entity id="avatar-parent" position="0 -1.6 -2.5">
             <a-entity id="avatar"
                 gltf-model="avatar.glb"
-                scale="1.3 1.3 1.3"
+                scale="1.2 1.2 1.2"
                 viseme-lipsync>
             </a-entity>
         </a-entity>
@@ -38,25 +38,33 @@ AFRAME.registerComponent('viseme-lipsync', {
 
         this.el.addEventListener('model-loaded', () => {
             const obj = this.el.getObject3D('mesh');
+            
+            // 1. Бүх анимэйшнийг бүрэн зогсооно
             this.el.removeAttribute('animation-mixer'); 
 
             obj.traverse(node => {
                 if (node.isBone) {
                     const name = node.name.toLowerCase();
                     
-                    // ГАРЫГ ХҮЧЭЭР ЗӨВ БАЙРЛАЛД ОРУУЛАХ
+                    // 2. ГАРНЫ ЯСНЫ ЭРГЭЛТИЙГ ЗӨВХӨН ХАЖУУ ТИЙШ НЬ (Z тэнхлэг) ХӨДӨЛГӨНӨ
+                    // Ингэснээр гар урагшаа савирахгүй, цээж рүү орохгүй
                     if (name.includes('arm') || name.includes('upperarm')) {
-                        node.rotation.set(0, 0, 0); // Тэнхлэгийг цэвэрлэх
+                        // Бүх өмнөх эргэлтийг хүчээр тэглэнэ
+                        node.rotation.set(0, 0, 0); 
                         
                         if (name.includes('left')) {
-                            // Гарыг биеэс бага зэрэг холдуулж (X), доош нь унжуулах (Z)
-                            node.rotation.z = 1.45; 
-                            node.rotation.x = 0.2; 
+                            // Зүүн гарыг хажуу тийш нь доошлуулна
+                            node.quaternion.setFromAxisAngle(new THREE.Vector3(0, 0, 1), 1.4);
                         }
                         if (name.includes('right')) {
-                            node.rotation.z = -1.45;
-                            node.rotation.x = 0.2;
+                            // Баруун гарыг хажуу тийш нь доошлуулна
+                            node.quaternion.setFromAxisAngle(new THREE.Vector3(0, 0, 1), -1.4);
                         }
+                    }
+                    
+                    // Мөрийг бага зэрэг доошлуулж байгалийн харагдуулна
+                    if (name.includes('shoulder')) {
+                        node.rotation.set(0, 0, 0);
                     }
                 }
 
@@ -66,6 +74,7 @@ AFRAME.registerComponent('viseme-lipsync', {
             });
         });
 
+        // LIP SYNC LOGIC
         const V = name => dict && dict[name] !== undefined ? dict[name] : -1;
         const vis = {
             aa: () => V('viseme_aa'), ee: () => V('viseme_E'),
