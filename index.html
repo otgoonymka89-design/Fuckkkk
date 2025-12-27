@@ -48,7 +48,7 @@ AFRAME.registerComponent('viseme-lipsync', {
                     
                     // Гарыг байгалийн байдлаар доош нь унжуулах (Ready Player Me / Mixamo)
                     if (name.includes('arm') || name.includes('upperarm')) {
-                        node.rotation.set(0.5, 1, 0.5); // Тэнхлэгийг тэглэх
+                        node.rotation.set(0, 1.5, 0); // Тэнхлэгийг тэглэх
                         
                         if (name.includes('left')) {
                             // Z тэнхлэгийг 1.4 болгосноор гар хажуу тийшээ зөв бууна
@@ -119,6 +119,7 @@ AFRAME.registerComponent('viseme-lipsync', {
 </script>
 </body>
 </html>
+
 
 
 
