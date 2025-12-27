@@ -3,29 +3,34 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AR Avatar - Final Arm & Lipsync Fix</title>
+    <title>AR Avatar - Direct View</title>
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
 </head>
 
 <body style="margin: 0; overflow: hidden;">
-    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;" vr-mode-ui="enabled: false">
+    <a-scene 
+        embedded 
+        arjs="sourceType: webcam; debugUIEnabled: false;" 
+        vr-mode-ui="enabled: false">
+        
         <a-assets>
             <audio id="voice" src="voice.mp3" preload="auto"></audio>
         </a-assets>
 
-        <a-entity id="avatar-parent" position="0 -1.7 -2.8">
+        <a-entity id="avatar-parent" position="0 -1.5 -3">
             <a-entity id="avatar"
                 gltf-model="avatar.glb"
-                scale="1.3 1.3 1.3"
+                scale="1.2 1.2 1.2"
                 viseme-lipsync>
             </a-entity>
         </a-entity>
 
-        <a-light type="ambient" intensity="1.4"></a-light>
+        <a-light type="ambient" intensity="1.2"></a-light>
         <a-light type="directional" position="1 2 1" intensity="1"></a-light>
-        <a-entity camera look-controls="enabled: false"></a-entity>
+        
+        <a-entity camera></a-entity>
     </a-scene>
 
 <script>
@@ -36,71 +41,54 @@ AFRAME.registerComponent('viseme-lipsync', {
 
         this.el.addEventListener('model-loaded', () => {
             const obj = this.el.getObject3D('mesh');
-            this.el.removeAttribute('animation-mixer'); 
 
+            if (obj.animations && obj.animations.length > 0) {
+                let idleAnim = obj.animations.find(a => a.name.toLowerCase().includes('idle'));
+                if (!idleAnim) idleAnim = obj.animations[0];
+                this.el.setAttribute('animation-mixer', { clip: idleAnim.name, loop: 'repeat' });
+            }
+
+            // Таны өмнөх гар, мөрний код (хэвээр үлдээв)
             obj.traverse(node => {
                 if (node.isBone) {
                     const name = node.name.toLowerCase();
-                    
-                    // МӨР ТОЛГОЙНЫ ХАЖУУД ГАРАХААС СЭРГИЙЛЭХ ЗАСВАР
-                    if (name.includes('arm') || name.includes('upperarm')) {
-                        node.rotation.set(0, 0, 0); 
-                        
-                        // Хэрэв Z тэнхлэгээр дээшээ болоод байвал X тэнхлэгээр доошлуулна
-                        if (name.includes('left')) {
-                            node.rotation.x = 1.4; // Гарыг урагш биш, доош чиглүүлнэ
-                            node.rotation.z = 0.1; // Мөрийг чих рүү шахахгүй байх утга
-                        } else if (name.includes('right')) {
-                            node.rotation.x = 1.4; 
-                            node.rotation.z = -0.1;
-                        }
+                    if (name.includes('leftarm') || name.includes('lupperarm') || name.includes('left_arm') || name.includes('l_shoulder')) {
+                        node.rotation.x = 1.5; 
                     }
-                    
-                    // Мөрийг (Shoulder) хүчээр доош нь дарж өгөх
-                    if (name.includes('shoulder')) {
-                        node.rotation.set(0, 0, 0);
-                        node.rotation.z = (name.includes('left')) ? -0.2 : 0.2;
+                    if (name.includes('rightarm') || name.includes('rupperarm') || name.includes('right_arm') || name.includes('r_shoulder')) {
+                        node.rotation.x = 1.5;
                     }
                 }
-
                 if (node.morphTargetDictionary && node.morphTargetInfluences) {
-                    mesh = node; dict = node.morphTargetDictionary; infl = node.morphTargetInfluences;
+                    mesh = node;
+                    dict = node.morphTargetDictionary;
+                    infl = node.morphTargetInfluences;
                 }
             });
         });
 
-        // UU, OO, II, AA, EE АВИАНУУДЫН ТОХИРГОО
-        const V = (n) => (dict && dict[n] !== undefined) ? dict[n] : -1;
+        // LIP SYNC LOGIC
+        const V = name => dict && dict[name] !== undefined ? dict[name] : -1;
         const vis = {
-            aa: () => V('viseme_aa'),
-            oo: () => V('viseme_O'),
-            uu: () => V('viseme_U'),
-            ii: () => V('viseme_I'),
-            ee: () => V('viseme_E'),
-            open: () => V('mouthOpen')
+            aa: () => V('viseme_aa'), ee: () => V('viseme_E'),
+            ii: () => V('viseme_I'), oo: () => V('viseme_O'),
+            uu: () => V('viseme_U'), open: () => V('mouthOpen')
         };
-        
-        const smooth = (i, v) => { if (i >= 0) infl[i] = (infl[i] || 0) * 0.7 + v * 0.3; };
+        const smooth = (i, v) => { if (i >= 0) infl[i] = infl[i] * 0.6 + v * 0.4; };
 
         const animate = () => {
             if (!analyser) return;
             analyser.getByteFrequencyData(data);
-            
-            let low = 0, mid = 0;
-            for(let i=0; i<40; i++) low += data[i];
-            for(let i=40; i<120; i++) mid += data[i];
-            low = (low/40)/255; mid = (mid/80)/255;
-
+            const avg = (a, b) => {
+                let s = 0, c = 0;
+                for (let i = a; i < b && i < data.length; i++) { s += data[i]; c++; }
+                return (s / c) / 255;
+            };
+            const low = avg(0, 200); const mid = avg(200, 1200);
             Object.values(vis).forEach(f => { const i = f(); if (i >= 0) infl[i] = 0; });
-
-            // Авиа бүрт тохирох Morph Target-ийг идэвхжүүлэх
-            smooth(vis.aa(), Math.min(1, low * 4.0));
-            smooth(vis.oo(), Math.min(1, low * 3.0));
-            smooth(vis.uu(), Math.min(1, low * 2.5));
-            smooth(vis.ii(), Math.min(1, mid * 3.5));
-            smooth(vis.ee(), Math.min(1, mid * 2.8));
-            smooth(vis.open(), Math.min(1, low * 2.0));
-
+            smooth(vis.aa(), Math.max(0, Math.min(1, low * 3.0)));
+            smooth(vis.open(), Math.max(0, Math.min(1, low * 3.0)));
+            smooth(vis.ee(), Math.max(0, Math.min(1, mid * 2.0)));
             requestAnimationFrame(animate);
         };
 
@@ -109,13 +97,18 @@ AFRAME.registerComponent('viseme-lipsync', {
                 ctx = new (window.AudioContext || window.webkitAudioContext)();
                 const src = ctx.createMediaElementSource(audio);
                 analyser = ctx.createAnalyser();
-                src.connect(analyser); analyser.connect(ctx.destination);
+                analyser.fftSize = 1024;
+                src.connect(analyser);
+                analyser.connect(ctx.destination);
                 data = new Uint8Array(analyser.frequencyBinCount);
             }
-            await ctx.resume(); audio.play(); animate();
+            await ctx.resume();
+            audio.play();
+            animate();
         }, { once: true });
     }
 });
 </script>
 </body>
 </html>
+
