@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AR Avatar - Correct Arms Fix</title>
+    <title>AR Avatar - Fixed Arms & Static View</title>
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
@@ -15,18 +15,18 @@
             <audio id="voice" src="voice.mp3" preload="auto"></audio>
         </a-assets>
 
-        <a-entity id="avatar-parent" position="0 0 -3.5">
-            <a-entity id="avatar"
-                gltf-model="avatar.glb"
-                scale="1.3 1.3 1.3"
-                position="0 -2 0" 
-                viseme-lipsync>
+        <a-entity camera look-controls="enabled: false">
+            <a-entity id="avatar-parent" position="0 -1.8 -3.5">
+                <a-entity id="avatar"
+                    gltf-model="avatar.glb"
+                    scale="1.3 1.3 1.3"
+                    viseme-lipsync>
+                </a-entity>
             </a-entity>
         </a-entity>
 
         <a-light type="ambient" intensity="1.2"></a-light>
         <a-light type="directional" position="1 2 1" intensity="1"></a-light>
-        <a-entity camera></a-entity>
     </a-scene>
 
 <script>
@@ -38,30 +38,31 @@ AFRAME.registerComponent('viseme-lipsync', {
 
         this.el.addEventListener('model-loaded', () => {
             const obj = this.el.getObject3D('mesh');
-            
-            // Анимэйшн гарыг хөдөлгөхөөс сэргийлж устгана
-            this.el.removeAttribute('animation-mixer');
+            this.el.removeAttribute('animation-mixer'); 
 
             obj.traverse(node => {
                 if (node.isBone) {
                     const name = node.name.toLowerCase();
                     
-                    // Гарыг байгалийн байдлаар доош нь унжуулах (Ready Player Me / Mixamo)
+                    // ГАРНЫ ЗАСВАР: Бие рүү орохоос сэргийлж Y болон Z тэнхлэгийг нарийн тааруулав
                     if (name.includes('arm') || name.includes('upperarm')) {
-                        node.rotation.set(0, 1.5, 0); // Тэнхлэгийг тэглэх
+                        node.rotation.set(0, 0, 0); 
                         
                         if (name.includes('left')) {
-                            // Z тэнхлэгийг 1.4 болгосноор гар хажуу тийшээ зөв бууна
-                            node.rotation.z = 0; 
-                            node.rotation.x = 1; 
-                            node.rotation.y = 0;
+                            node.rotation.z = 1.4;  // Доош буулгах
+                            node.rotation.y = -0.2; // Биенээс бага зэрэг холдуулах (урагш/хойш)
+                            node.rotation.x = 0.1;  // Гадагш нь дэлгэх
                         }
                         if (name.includes('right')) {
-                            // Баруун гарыг эсрэг чиглэлд
-                            node.rotation.z = 0;
-                            node.rotation.x = 1;
-                            node.rotation.y = 0;
+                            node.rotation.z = -1.4; // Доош буулгах
+                            node.rotation.y = 0.2;  // Биенээс холдуулах
+                            node.rotation.x = 0.1;  // Гадагш нь дэлгэх
                         }
+                    }
+                    // Мөрний хэсгийг бага зэрэг гадагшлуулах
+                    if (name.includes('shoulder')) {
+                        if (name.includes('left')) node.rotation.z = 0.1;
+                        if (name.includes('right')) node.rotation.z = -0.1;
                     }
                 }
 
@@ -71,15 +72,11 @@ AFRAME.registerComponent('viseme-lipsync', {
             });
         });
 
-        // LIP SYNC LOGIC
         const V = name => dict && dict[name] !== undefined ? dict[name] : -1;
         const vis = {
-            aa: () => V('viseme_aa'),
-            ee: () => V('viseme_E'),
-            ii: () => V('viseme_I'),
-            oo: () => V('viseme_O'),
-            uu: () => V('viseme_U'),
-            sil: () => V('viseme_sil'),
+            aa: () => V('viseme_aa'), ee: () => V('viseme_E'),
+            ii: () => V('viseme_I'), oo: () => V('viseme_O'),
+            uu: () => V('viseme_U'), sil: () => V('viseme_sil'),
             open: () => V('mouthOpen')
         };
         const smooth = (i, v) => { if (i >= 0) infl[i] = (infl[i] || 0) * 0.6 + v * 0.4; };
@@ -119,10 +116,3 @@ AFRAME.registerComponent('viseme-lipsync', {
 </script>
 </body>
 </html>
-
-
-
-
-
-
-
